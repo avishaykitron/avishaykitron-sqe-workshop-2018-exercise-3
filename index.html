@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <style>
+        table {
+            width: 100%;
+        }
+        .textAreaWrapper {
+            width: 100%;
+            height: 50%;
+        }
+        .resultWrapper{
+            width: 100%;
+            height: 80%;
+            padding: 20px;
+        }
+        .green{
+            background-color:green;
+        }
+        .red{
+            background-color:red
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+        }
+
+    </style>
+</head>
+<body>
+<table>
+    <tr>
+        <td>
+            <div>
+                <label>Enter code here</label>
+            </div>
+        </td>
+        <td>
+            <div>
+                <label>Parsed code here</label>
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <div class="textAreaWrapper">
+                <textarea id="codePlaceholder" title="Enter code here"></textarea>
+            </div>
+        </td>
+        <td>
+            <div class="resultWrapper" id="parsedCode">
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <div class="textAreaWrapper">
+                <textarea id="argPlaceholder" title="Enter code here"></textarea>
+            </div>
+        </td>
+        <td>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <div>
+                <button id="codeSubmissionButton">Parse code</button>
+            </div>
+        </td>
+        <td>
+        </td>
+    </tr>
+</table>
+
+<script src="dist/bundle.js"></script>
+</body>
+</html>
