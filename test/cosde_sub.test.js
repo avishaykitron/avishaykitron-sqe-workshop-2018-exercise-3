@@ -120,7 +120,35 @@ describe('Sub while with update expression' , () => {
         );
     });
 });
-describe('Sub while with update expression red line' , () => {
+describe('local array and local null' , () => {
+    it('is sub work correctly', () => {
+        assert.equal(
+            parseCode(
+                'function foo(x){\n' +
+                '    let a = [1,2,3];\n' +
+                '    let b;\n' +
+                '    if(a.length>10){\n' +
+                '        return -x[0];\n' +
+                '    }\n' +
+                '    return a;\n' +
+                '}'+'let g = 3;\n', {'x':[1 ,2 ,3]}),
+            'function foo(x){<br>\n<mark class="red">    if(3 > 10){</mark><br>\n        return -x[0] ;<br>\n    }<br>\n    return 1,2,3;<br>\n}let g = 3;<br>\n'
+        );
+    });
+});
+describe('paramter assginment' , () => {
+    it('is sub work correctly', () => {
+        assert.equal(
+            parseCode(
+                'function foo(x){\n' +
+                '    x = 4;\n' +
+                '    x ++;\n' +
+                '    return x;\n' +
+                '}', {'x':3}),
+            'function foo(x){<br>\n    x = 4;<br>\n    x = x + 1;<br>\n    return x;<br>\n}<br>\n' );
+    });
+});
+describe('Sub else' , () => {
     it('is sub work correctly', () => {
         assert.equal(
             parseCode(
@@ -129,9 +157,23 @@ describe('Sub while with update expression red line' , () => {
                 '    if(a.length>10){\n' +
                 '        return a[0];\n' +
                 '    }\n' +
-                '    return a;\n' +
-                '}'+'let g = 3;\n', {'x':[1 ,2 ,3]}),
-            'function foo(x){<br>\n<mark class="red">    if(x.length > 10){</mark><br>\n        return x[0] ;<br>\n    }<br>\n    return x;<br>\n}let g = 3;<br>\n'
+                '    else{\n' +
+                '        return 0;}}\n' , {'x':[1 ,2 ,3]}),
+            'function foo(x){<br>\n<mark class="red">    if(x.length > 10){</mark><br>\n        return x[0] ;<br>\n    }<br>\n    else{<br>\n        return 0;}}<br>\n'
+        );
+    });
+});
+
+describe('Sub arrays ass' , () => {
+    it('is sub work correctly', () => {
+        assert.equal(
+            parseCode(
+                'function soo(){\n' +
+                '    let a = [1 ,2];\n' +
+                '    let b = a;\n' +
+                '    return b[0];\n' +
+                '}' , {}),
+            'function soo(){<br>\n    return 1 ;<br>\n}<br>\n'
         );
     });
 });

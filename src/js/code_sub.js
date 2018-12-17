@@ -232,9 +232,9 @@ function handle_update(parsecode, environment, lines){
     if (args.includes(left) === false) {
         lines[parsecode.loc.start.line - 1] = '';}
     else {
-        let line = parsecode.right.loc.start.line;
+        let line = parsecode.argument.loc.start.line;
         let currLine = lines[line - 1];
-        lines[line - 1] = currLine.substring(0, parsecode.right.loc.start.column) + value + currLine.substring(parsecode.right.loc.end.column);
+        lines[line - 1] = currLine.substring(0, parsecode.argument.loc.start.column) + left + ' = ' + value + ';';
     }
     return lines;
 }

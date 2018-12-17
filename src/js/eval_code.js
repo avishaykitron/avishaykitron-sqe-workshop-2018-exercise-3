@@ -52,9 +52,7 @@ function handle_assignment(parsed_code, enviroment, lines) {
     let left = sub.get_expression(parsed_code.left);
     let right = sub.get_expression(parsed_code.right);
     let value = sub.substituteExpression(enviroment, right);
-    if(enviroment.hasOwnProperty(left)) {
-        enviroment[left] = value;
-    }
+    enviroment[left] = value;
     return lines;
 }
 
