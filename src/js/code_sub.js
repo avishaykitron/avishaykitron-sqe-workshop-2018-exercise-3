@@ -32,6 +32,7 @@ function get_function_code(parsecode){
     return ans;
 }
 function sub_parsed_code(parsed_code , enviroment , lines){
+    //doc
     if(parsed_code.type === 'ReturnStatement'|| parsed_code.type === 'FunctionDeclaration'|| parsed_code.type ==='BlockStatement'|| parsed_code.type ==='VariableDeclaration'){
         return sub_parsed_code_main(parsed_code , enviroment , lines);
     }
