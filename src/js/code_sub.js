@@ -1,86 +1,116 @@
+import * as escodegen from 'escodegen';
+import * as esgraph from 'esgraph';
 import * as esprima from 'esprima';
-export {subtition, substituteExpression , get_function_code , get_globals , get_expression};
+export {dot_impel, substituteExpression ,  get_expression};
 
-const subtition = (input) => {
-    let parsecode = esprima.parseScript(input, { loc: true });
-    let enviroment = {};
-    let lines = input.split('\n');
-    let function_code = get_function_code(parsecode);
-    let subtitued_code = sub_parsed_code(parsecode.body[function_code], enviroment, lines);
-    return final_code(subtitued_code);
-
+const dot_impel = (input, args) => {
+    let parsecode = esprima.parseScript(input, { range: true });
+    let enviroment = getParams(parsecode.body[0].params , args);
+    let nodes = esgraph(parsecode.body[0].body)[2];
+    nodes = nodes.slice(1, nodes.length - 1);
+    nodes[0].prev = [];
+    nodes.forEach(function (element) {
+        if(element.astNode.type === 'ReturnStatement'){
+            element.next = [];
+            delete element.normal;
+        }
+    });
+    nodes.forEach(function (element) {
+        element.label = escodegen.generate(element.astNode);
+    });
+    mergeNodes(nodes);
+    evalNodes(nodes[0] , enviroment);
+    create_merge_nodes(nodes);
+    return getGraph(nodes);
 };
-var args = [];
-function final_code(sub_code){
-    let ans = '';
-    sub_code.forEach(function(element) {
-        let split_element = element.trim().split(/\s+/);
-        if (split_element.length !== 1 || split_element[0] !== ''){
-            ans = ans + element + '\n';}});
+function getParams(params , args){
+    let ans = {};
+    let dict = params.map((key) => {return {'key': key.name, 'value': args[key.name]};});
+    dict.forEach((element) => {ans[element.key]=element.value;});
     return ans;
 }
-
-function get_function_code(parsecode){
-    let counter =0 ;
-    let ans = counter;
-    parsecode.body.forEach(function(element){
-        if(element.type === 'FunctionDeclaration'){
-            ans = counter;
+function mergeNodes(nodes){
+    for (let i = 0 ; i < nodes.length ; i++){
+        let n = nodes[i];
+        while (n.normal && n.normal.normal && n.normal.prev.length ===1 ) {
+            n.next = n.normal.next;
+            n.label = n.label + '\n' + n.normal.label;
+            nodes.splice(nodes.indexOf(n.normal),1);
+            n.normal = n.normal.normal;}}
+}
+function evalNodes(node , enviroment){
+    node.green = true;
+    if(node.false && node.true){
+        let parsecode = esprima.parseScript(node.label, { range: true });
+        let test = evalr(parsecode.body[0] , enviroment);
+        if(test){
+            evalNodes(node.true ,enviroment);
         }
-        counter ++;
-    });
-    return ans;
-}
-function sub_parsed_code(parsed_code , enviroment , lines){
-    //doc
-    if(parsed_code.type === 'ReturnStatement'|| parsed_code.type === 'FunctionDeclaration'|| parsed_code.type ==='BlockStatement'|| parsed_code.type ==='VariableDeclaration'){
-        return sub_parsed_code_main(parsed_code , enviroment , lines);
-    }
-    else{
-        return sub_parsed_code_sec(parsed_code , enviroment , lines);
-    }
-}
-
-function sub_parsed_code_main(parsed_code , enviroment , lines) {
-    switch(parsed_code.type){
-    case 'FunctionDeclaration':  parsed_code.params.forEach(function(element) {args.push(element.name);});return block_handle(parsed_code.body, enviroment, lines);
-    case 'BlockStatement' : return block_handle(parsed_code , enviroment , lines);
-    case 'VariableDeclaration' : return variable_declartion_handle(parsed_code , enviroment , lines);
-    case 'ReturnStatement' : return return_handle(parsed_code , enviroment , lines);
-    }
-}
-
-function sub_parsed_code_sec(parsed_code , enviroment , lines){
-    switch (parsed_code.type) {
-    case 'IfStatement' : return handle_if(parsed_code , enviroment , lines);
-    case 'ExpressionStatement' : return handle_expr(parsed_code,enviroment , lines);
-    case 'WhileStatement' : return handle_while(parsed_code , enviroment , lines);
-    }
-}
-
-function block_handle(parsed_code , enviroment , lines){
-    parsed_code.body.forEach(function(element){
-        lines = sub_parsed_code(element, enviroment, lines);
-    });
-    return lines;
-}
-function variable_declartion_handle(parsed_Code, enviroment, lines)
-{
-    parsed_Code.declarations.forEach(function(element){
-        if(element.init !== null) {
-            if(get_expression(element.init).includes('[')){
-                enviroment[element.id.name] = create_Array_from_string(substituteExpression(enviroment,get_expression(element.init)));
-            }
-            else
-                enviroment[element.id.name] = substituteExpression(enviroment,get_expression(element.init));
+        else{
+            evalNodes(node.false , enviroment);
         }
-        else{enviroment[element.id.name] = null;}
-    });
-    let line = lines[parsed_Code.loc.start.line - 1];
-    lines[parsed_Code.loc.start.line - 1] = line.substring(0,parsed_Code.loc.start.column) + line.substring(parsed_Code.loc.end.column);
-    return lines;
+    }
+    else if(node.normal){
+        let parsecode = esprima.parseScript(node.label, { range: true });
+        evalr(parsecode , enviroment);
+        evalNodes(node.normal, enviroment);
+    }
+}
+function create_merge_nodes(nodes){
+    nodes.forEach(function (node) {
+        if(node.prev.length > 1){
+            let m_node =  esgraph('')[0];
+            m_node.label = '';
+            m_node.astNode = undefined;
+            m_node.next = node;
+            m_node.green = true;
+            m_node.prev = node.prev;
+            m_node.type = 'normal';
+            m_node.parent =node.parent;
+            m_node.normal = node;
+            node.parent = m_node;
+            node.prev.forEach(function (prev) {
+                prev.next = m_node;
+                prev.normal = m_node;});
+            node.prev = m_node;
+            nodes.push(m_node);}});
 }
 
+function getGraph(nodes){
+    let ans = ['digraph cfg { forcelabels=true '];
+    for (let [i, node] of nodes.entries()) {
+        let {label = node.type} = node;
+        ans.push(`n${i} [label="${label}", xlabel = ${i + 1}, `);
+        let s = 'rectangle';
+        if (node.true === true || node.false === true) {
+            s = 'diamond';}
+        else if(node.label === '')
+            s = 'circle';
+        ans.push(` shape=${s},`);
+        ans.push(color_green(node));
+        ans.push(']\n');}
+    getEdges(ans , nodes);
+    return ans.join('');
+
+}
+function color_green(node){
+    if (node.green === true) {return ' style = filled, fillcolor = green';}
+    return '';
+}
+function getEdges(ans , nodes){
+    for (let [i, node] of nodes.entries()) {
+        for (let type of ['normal', 'true', 'false']) {
+            let next = node[type];
+            if (!next)
+                continue;
+            ans.push(`n${i} -> n${nodes.indexOf(next)} [`);
+            if (['true', 'false'].includes(type))
+                ans.push(`label="${type.charAt(0).toUpperCase()}"`);
+            ans.push(']\n');
+        }
+    }
+    ans.push(' }');
+}
 function get_expression(exp){
     let res = '';
     if(exp.type === 'Literal' || exp.type === 'Identifier' || exp.type === 'ArrayExpression'){
@@ -163,7 +193,7 @@ function handle_array_property(enviroment , element ,array_func) {
     let ans = '';
     if (array_func[0] in enviroment){
         let arr =  enviroment[array_func[0]];
-        if(!args.includes(arr)){
+        if(!enviroment.includes(arr)){
             ans += ' ' + arr.length;
         }
         else{
@@ -180,7 +210,7 @@ function handle_array_acessor(enviroment , element) {
     let val = substituteExpression(enviroment , element.substring(start+1 , end));
     if (element.substring(0,start) in enviroment){
         let array_var = element.substring(0,start);
-        args.includes(enviroment[array_var]) ? ans += ' ' + enviroment[array_var] +'['+val+']' : ans += ' ' + enviroment[array_var][val] ;}
+        enviroment.includes(enviroment[array_var]) ? ans += ' ' + enviroment[array_var] +'['+val+']' : ans += ' ' + enviroment[array_var][val] ;}
     else{ans += ' ' + element;}
     return ans;
 }
@@ -197,99 +227,92 @@ function substituteExpression(enviroment , exp){
             else {if (element in enviroment) {ans += ' ' + enviroment[element];} else {ans += ' ' + element;}}
         }});return ans.substring(1);}
 
-function create_Array_from_string(array){
-    let ans  = [];
-    let array_elements = array.split('');
-    array_elements.forEach(function(element){
-        if(element != '[' && element != ']' && element != ' ' && element != '')
-            ans.push(element);
-    });
-    return ans;
-}
-function return_handle(parsecode, environment, lines)
-{
-    let expr = substituteExpression(environment, get_expression(parsecode.argument));
-    let line = parsecode.argument.loc.start.line;
-    let currLine = lines[line - 1];
-    lines[line - 1] = currLine.substring(0, parsecode.argument.loc.start.column) + expr + currLine.substring(parsecode.argument.loc.end.column);
-    return lines;
-}
-
-function handle_expr(parse_Code, environment, lines)
-{
-    switch (parse_Code.expression.type) {
-    case 'UpdateExpression': return handle_update (parse_Code.expression, environment, lines);
-    case 'AssignmentExpression': return handle_assignment(parse_Code.expression, environment, lines);
+function evalr_if_while(parsed_code , enviroment){
+    switch(parsed_code.type) {
+    case 'IfStatement' :
+        return handle_if(parsed_code, enviroment);
+    case 'WhileStatement':
+        return while_handle(parsed_code, enviroment);
+    case 'VariableDeclaration' : return handle_variable_dec(parsed_code,enviroment);
     }
 }
-function handle_update(parsecode, environment, lines){
-    let expr = get_expression(parsecode);
-    let chars = expr.split('=');
-    let left = chars[0];
-    let right = chars [1];
-    let value = substituteExpression(environment, right);
-    if(environment.hasOwnProperty(left)) {
-        environment[left] = value;}
-    if (args.includes(left) === false) {
-        lines[parsecode.loc.start.line - 1] = '';}
-    else {
-        let line = parsecode.argument.loc.start.line;
-        let currLine = lines[line - 1];
-        lines[line - 1] = currLine.substring(0, parsecode.argument.loc.start.column) + left + ' = ' + value + ';';
+function evalr_other(parsed_code , enviroment , lines){
+    switch(parsed_code.type){
+    case 'ExpressionStatement' : return handle_exp(parsed_code.expression , enviroment , lines);
+    case 'BlockStatement' : return block_handle(parsed_code , enviroment , lines);
+    case 'Program' : return block_handle(parsed_code , enviroment , lines);
     }
-    return lines;
 }
-function handle_assignment(parsecode, environment, lines)
-{
-    let left = get_expression(parsecode.left);
-    let right = get_expression(parsecode.right);
-    let value = substituteExpression(environment, right);
-    if(environment.hasOwnProperty(left)) {
-        environment[left] = value;}
-    if (args.includes(left) === false) {
-        lines[parsecode.loc.start.line - 1] = '';}
-    else {
-        let line = parsecode.right.loc.start.line;
-        let currLine = lines[line - 1];
-        lines[line - 1] = currLine.substring(0, parsecode.right.loc.start.column) + value + currLine.substring(parsecode.right.loc.end.column);
+
+function evalr(parsed_code , enviroment , lines) {
+    if(parsed_code.type === 'IfStatement' || parsed_code.type === 'WhileStatement' || parsed_code.type === 'VariableDeclaration'){
+        return evalr_if_while(parsed_code,enviroment,lines);
     }
-    return lines;
+    else{
+        return evalr_other(parsed_code,enviroment,lines);
+    }
 }
+function handle_exp(parsed_code, enviroment){
+    if(parsed_code.type === 'AssignmentExpression')
+        return handle_assignment(parsed_code , enviroment);
+    else if (parsed_code.type === 'UpdateExpression')
+        return handle_update(parsed_code ,enviroment);
+    else
+        return handle_binary(parsed_code , enviroment);
 
-function handle_if(parsecode, environment, lines) {
-    let val = substituteExpression(environment , get_expression(parsecode.test));
-    let line = parsecode.test.loc.start.line;
-    let currLine = lines[line - 1];
-    lines[line - 1] = currLine.substring(0, parsecode.test.loc.start.column) + val + currLine.substring(parsecode.test.loc.end.column);
-    lines = sub_parsed_code(parsecode.consequent, copy_env(environment), lines);
-    if(parsecode.alternate != null)
-        lines = sub_parsed_code(parsecode.alternate, copy_env(environment), lines);
-    return lines;
 }
+function handle_update(parsed_code ,enviroment){
+    let left = get_expression(parsed_code.argument);
+    if(parsed_code.operator === '++')
+        enviroment[left] = enviroment[left] + ' + 1';
+    else
+        enviroment[left] = enviroment[left] + ' - 1';
+    return true;
 
-function handle_while(parsecode, environment, lines) {
-    let val = substituteExpression(environment ,get_expression(parsecode.test));
-    let line = parsecode.test.loc.start.line;
-    let currLine = lines[line - 1];
-    lines[line - 1] = currLine.substring(0, parsecode.test.loc.start.column) + val + currLine.substring(parsecode.test.loc.end.column);
-    return sub_parsed_code(parsecode.body, copy_env(environment), lines);
 }
+function handle_binary(parsed_code , enviroment){
+    let left = substituteExpression(enviroment ,get_expression(parsed_code.left) );
+    let right = substituteExpression(enviroment ,get_expression(parsed_code.right));
+    return eval(left + parsed_code.operator + right);
 
-
-function copy_env(env) {
-    let new_env = JSON.parse(JSON.stringify(env));
-    return new_env;
 }
-
-
-function get_globals(parsecode){
-    let globals = {};
-    parsecode.body.forEach(function(element){
-        if(element.type === 'VariableDeclaration'){
-            element.declarations.forEach(function (v){
-                globals[v.id.name] = get_expression(v.init);
-            });
+function handle_assignment(parsed_code, enviroment) {
+    let left = get_expression(parsed_code.left);
+    let right = get_expression(parsed_code.right);
+    let value = substituteExpression(enviroment, right);
+    enviroment[left] = value;
+    return true;
+}
+function handle_variable_dec(parsed_code, enviroment){
+    parsed_code.declarations.forEach(function (element) {
+        if(element.init != null){
+            let right = get_expression(element.init);
+            let value = substituteExpression(enviroment, right);
+            enviroment[element.id.name] = value;
         }
     });
-    return globals;
+    return true;
+}
+
+function handle_if(parsed_code, enviroment) {
+    let cond = eval(substituteExpression(enviroment, get_expression(parsed_code.test)));
+    if (cond) {
+        return evalr(parsed_code.consequent, enviroment);
+    }
+    else{
+        if(parsed_code.alternate !== null)
+            return evalr(parsed_code.alternate, enviroment);
+    }
+}
+
+function block_handle(parsed_code, enviroment){
+    parsed_code.body.forEach(function(element){
+        evalr(element, enviroment);
+    });
+    return true;
+}
+
+
+function while_handle(parsed_code, enviroment){
+    return evalr(parsed_code.body, enviroment);
 }

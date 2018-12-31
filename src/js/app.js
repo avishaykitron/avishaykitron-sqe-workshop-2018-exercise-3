@@ -1,13 +1,17 @@
 import $ from 'jquery';
 import {parseCode} from './code-analyzer';
-
+import Viz from 'viz.js';
+import {Module, render} from 'viz.js/full.render.js';
 
 $(document).ready(function () {
     $('#codeSubmissionButton').click(() => {
         let code = $('#codePlaceholder').val();
         let args = $('#argPlaceholder').val();
         let parsedCode = parseCode(code, JSON.parse(args));
-        $('#parsedCode').html(parsedCode);
+        let viz = new Viz({ Module, render });
+        viz.renderSVGElement(parsedCode).then(function(element) {
+            $('#parsedCode').html(element);
+        });
 
     });
 });

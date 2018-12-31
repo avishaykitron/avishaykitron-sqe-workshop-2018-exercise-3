@@ -2,7 +2,7 @@ import * as sub from './code_sub.js';
 import * as esprima from 'esprima';
 
 const eval_code = (input, args) => {
-    let parsecode = esprima.parseScript(input, { loc: true });
+    let parsecode = esprima.parseScript(input, { range: true });
     let lines = input.split('\n');
     let globals = sub.get_globals(parsecode);
     let enviroment = globals;
