@@ -8,12 +8,12 @@ const dot_impel = (input, args) => {
     let enviroment = getParams(parsecode.body[0].params , args);
     let nodes = esgraph(parsecode.body[0].body)[2];
     nodes = nodes.slice(1, nodes.length - 1);
+    if(nodes.length ===0) return '';
     nodes[0].prev = [];
     nodes.forEach(function (element) {
         if(element.astNode.type === 'ReturnStatement'){
             element.next = [];
-            delete element.normal;
-        }
+            delete element.normal;}
     });
     nodes.forEach(function (element) {
         element.label = escodegen.generate(element.astNode);
@@ -70,32 +70,32 @@ function create_merge_nodes(nodes){
             m_node.normal = node;
             node.parent = m_node;
             node.prev.forEach(function (prev) {
-                prev.next = m_node;
-                prev.normal = m_node;});
+                nodes.forEach(function (element) {
+                    if(element.label.includes(prev.label)){
+                        element.next = m_node;
+                        element.normal = m_node;}});});
             node.prev = m_node;
-            nodes.push(m_node);}});
-}
+            nodes.push(m_node);}});}
 
 function getGraph(nodes){
     let ans = ['digraph cfg { forcelabels=true '];
     for (let [i, node] of nodes.entries()) {
-        let {label = node.type} = node;
+        let label = node.label;
         ans.push(`n${i} [label="${label}", xlabel = ${i + 1}, `);
         let s = 'rectangle';
-        if (node.true === true || node.false === true) {
-            s = 'diamond';}
-        else if(node.label === '')
+        if(node.label === '')
             s = 'circle';
+        else if (node.true || node.false) {
+            s = 'diamond';}
         ans.push(` shape=${s},`);
-        ans.push(color_green(node));
-        ans.push(']\n');}
+        ans.push(color_green(node));}
     getEdges(ans , nodes);
     return ans.join('');
 
 }
 function color_green(node){
-    if (node.green === true) {return ' style = filled, fillcolor = green';}
-    return '';
+    if (node.green === true) {return ' style = filled, fillcolor = green]\n';}
+    return ']\n';
 }
 function getEdges(ans , nodes){
     for (let [i, node] of nodes.entries()) {
@@ -191,16 +191,8 @@ function handle_Unary_Expression(exp){
 }
 function handle_array_property(enviroment , element ,array_func) {
     let ans = '';
-    if (array_func[0] in enviroment){
-        let arr =  enviroment[array_func[0]];
-        if(!enviroment.includes(arr)){
-            ans += ' ' + arr.length;
-        }
-        else{
-            ans += ' ' +arr + '.length';
-        }
-    }
-    else{ans += ' ' + element;}
+    let arr =  enviroment[array_func[0]];
+    ans += ' ' + arr.length;
     return ans;
 }
 function handle_array_acessor(enviroment , element) {
@@ -208,10 +200,8 @@ function handle_array_acessor(enviroment , element) {
     let start = element.indexOf('[');
     let end = element.indexOf(']');
     let val = substituteExpression(enviroment , element.substring(start+1 , end));
-    if (element.substring(0,start) in enviroment){
-        let array_var = element.substring(0,start);
-        enviroment.includes(enviroment[array_var]) ? ans += ' ' + enviroment[array_var] +'['+val+']' : ans += ' ' + enviroment[array_var][val] ;}
-    else{ans += ' ' + element;}
+    let array_var = element.substring(0,start);
+    ans += ' ' + enviroment[array_var][val] ;
     return ans;
 }
 function substituteExpression(enviroment , exp){
@@ -227,26 +217,16 @@ function substituteExpression(enviroment , exp){
             else {if (element in enviroment) {ans += ' ' + enviroment[element];} else {ans += ' ' + element;}}
         }});return ans.substring(1);}
 
-function evalr_if_while(parsed_code , enviroment){
-    switch(parsed_code.type) {
-    case 'IfStatement' :
-        return handle_if(parsed_code, enviroment);
-    case 'WhileStatement':
-        return while_handle(parsed_code, enviroment);
-    case 'VariableDeclaration' : return handle_variable_dec(parsed_code,enviroment);
-    }
-}
 function evalr_other(parsed_code , enviroment , lines){
     switch(parsed_code.type){
     case 'ExpressionStatement' : return handle_exp(parsed_code.expression , enviroment , lines);
-    case 'BlockStatement' : return block_handle(parsed_code , enviroment , lines);
     case 'Program' : return block_handle(parsed_code , enviroment , lines);
     }
 }
 
 function evalr(parsed_code , enviroment , lines) {
-    if(parsed_code.type === 'IfStatement' || parsed_code.type === 'WhileStatement' || parsed_code.type === 'VariableDeclaration'){
-        return evalr_if_while(parsed_code,enviroment,lines);
+    if(parsed_code.type === 'VariableDeclaration'){
+        return handle_variable_dec(parsed_code,enviroment);
     }
     else{
         return evalr_other(parsed_code,enviroment,lines);
@@ -287,14 +267,27 @@ function handle_variable_dec(parsed_code, enviroment){
     parsed_code.declarations.forEach(function (element) {
         if(element.init != null){
             let right = get_expression(element.init);
-            let value = substituteExpression(enviroment, right);
-            enviroment[element.id.name] = value;
+            if(right.includes('[') && right.indexOf('[')===0){
+                enviroment[element.id.name] = create_Array_from_string(substituteExpression(enviroment, right));
+            }
+            else {
+                let value = substituteExpression(enviroment, right);
+                enviroment[element.id.name] = value;
+            }
         }
     });
     return true;
 }
-
-function handle_if(parsed_code, enviroment) {
+function create_Array_from_string(array){
+    let ans  = [];
+    let array_elements = array.split('');
+    array_elements.forEach(function(element){
+        if(element != '[' && element != ']' && element != ' ' && element != '')
+            ans.push(element);
+    });
+    return ans;
+}
+/*function handle_if(parsed_code, enviroment) {
     let cond = eval(substituteExpression(enviroment, get_expression(parsed_code.test)));
     if (cond) {
         return evalr(parsed_code.consequent, enviroment);
@@ -303,7 +296,7 @@ function handle_if(parsed_code, enviroment) {
         if(parsed_code.alternate !== null)
             return evalr(parsed_code.alternate, enviroment);
     }
-}
+}*/
 
 function block_handle(parsed_code, enviroment){
     parsed_code.body.forEach(function(element){
@@ -313,6 +306,6 @@ function block_handle(parsed_code, enviroment){
 }
 
 
-function while_handle(parsed_code, enviroment){
+/*function while_handle(parsed_code, enviroment){
     return evalr(parsed_code.body, enviroment);
-}
+}*/
