@@ -98,17 +98,15 @@ function color_green(node){
     return ']\n';
 }
 function getEdges(ans , nodes){
-    for (let [i, node] of nodes.entries()) {
+    for (let [index, node] of nodes.entries()) {
         for (let type of ['normal', 'true', 'false']) {
-            let next = node[type];
-            if (!next)
+            let next_node = node[type];
+            if (!next_node)
                 continue;
-            ans.push(`n${i} -> n${nodes.indexOf(next)} [`);
+            ans.push(`n${index} -> n${nodes.indexOf(next_node)} [`);
             if (['true', 'false'].includes(type))
                 ans.push(`label="${type.charAt(0).toUpperCase()}"`);
-            ans.push(']\n');
-        }
-    }
+            ans.push(']\n');}}
     ans.push(' }');
 }
 function get_expression(exp){
